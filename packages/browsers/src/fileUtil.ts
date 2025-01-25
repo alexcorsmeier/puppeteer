@@ -14,7 +14,10 @@ import tar from 'tar-fs';
 import bzip from 'unbzip2-stream';
 import type {ZipFile} from 'yauzl';
 
-async function extractZip(
+/**
+ * @internal
+ */
+export async function extractZip(
   archivePath: string,
   folderPath: string,
 ): Promise<void> {
@@ -41,11 +44,13 @@ async function extractZip(
   zipfile.on('entry', async entry => {
     const dest = path.join(folderPath, entry.fileName);
     const mode = (entry.externalFileAttributes >> 16) & 0xffff;
-    if (entry.fileName.endsWith('/')) {
+    if (entry.fileName.startsWith('__MACOSX/')) {
+      zipfile.readEntry();
+    } else if (entry.fileName.endsWith('/')) {
       // directory
       await mkdir(dest, {
         recursive: true,
-        mode: (mode === 0 ? 0o755 : mode) & 0o777,
+        mode: mode === 0 ? 0o755 : mode & 0o777,
       });
       zipfile.readEntry();
     } else {
@@ -60,7 +65,7 @@ async function extractZip(
           recursive: true,
         });
         const output = createWriteStream(dest, {
-          mode: (mode === 0 ? 0o644 : mode) & 0o777,
+          mode: mode === 0 ? 0o644 : mode & 0o777,
         });
         readStream.on('end', function () {
           zipfile.readEntry();
